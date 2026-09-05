@@ -9,7 +9,7 @@ A cryptocurrency portfolio dashboard that streams live Binance prices over WebSo
 ![Dashboard screenshot](docs/screenshot.png)
 ![Price alert demo](docs/alerts-demo.gif)
 
-**Live demo:** [Add Vercel link here]
+**Live demo:** https://portfolio-tracker-theta-amber.vercel.app/
 
 ## Features
 
@@ -88,14 +88,25 @@ npm run build     # tsc -b && vite build
 
 Test coverage includes portfolio math, SMA, formatting, sort/filter, Binance message parsers, the market pipeline (batching, throttling, backoff, retry via a fake `WebSocket`), alert crossing/persistence/watcher, and key components. The virtual scroll container and canvas chart are intentionally not unit-tested (jsdom has no layout/canvas); the logic they depend on is covered through extracted pure functions.
 
-## Lessons Learned / Performance Notes
+## Performance
+
+**Lighthouse Score: Performance 88 | Accessibility 87 | Best Practices 100 | SEO 90**
+
+Key optimizations applied:
+
+- **Code-splitting and lazy loading for chart panels** — `CandleChart` (lightweight-charts, 171 KB), `PortfolioChart` (Recharts, 355 KB), and `OrderBook` load via `React.lazy` + `Suspense` with skeleton fallbacks after first paint. Initial JS dropped from 917 KB to 390 KB (123 KB gzip, **−57%**). Framer Motion intentionally stays in the initial bundle — it's shared by above-the-fold rows/ticker/toasts.
+- **Table virtualization (`@tanstack/react-virtual`)** — only visible holdings rows exist in the DOM (+ overscan), with stable `table-fixed` column widths; row position is spring-animated, doubling as the sort-reorder glide.
+- **Memoization (`React.memo`, `useMemo`, granular Zustand selectors)** — a single coin's tick re-renders only that row and ticker item during high-frequency WebSocket price updates; referentially stable price objects let `Object.is` bail out everything else.
+- **Non-blocking WebSocket startup** — the connection is established in a mount effect (async, never blocks paint); first paint renders skeletons/critical UI immediately while ticks stream in.
+
+## Lessons Learned
 
 - **Catalogs rot.** A 130-pair list silently accumulated delisted/migrated symbols (BUSD, MATIC→POL, AGIX/OCEAN→FET) whose rows could never receive data. Curating a verified 20-pair universe beat any amount of subscription-batching logic.
 - **Mock data needs calibration, not randomness.** Hash-generated buy prices produced a −92% portfolio; calibrating against live prices (≈ +3.5% overall, mixed winners/losers) made the dashboard believable.
 - **Selectors returning new identities are silent killers** — in both Zustand (`Object.is` bailouts) and React (`memo`, effect deps). Caught twice: price objects and a filtered-alerts selector.
 - **Match the parser to the stream.** `@depth20` partial-book snapshots use `bids`/`asks`, not the diff-stream `b`/`a` — verified against the live socket, not the docs alone.
-- **Code-splitting (done).** The two chart renderers load behind `React.lazy` + `Suspense` with skeleton fallbacks, after first paint. Production chunks: initial `index` 390 KB (123 KB gzip: React, Framer Motion, store, header/ticker/summary/table) vs. the previous single 917 KB / 282 KB-gzip chunk (**−57%**); lazy `PortfolioChart` 355 KB (Recharts + d3), `CandleChart` 171 KB (lightweight-charts), `OrderBook` 4 KB. Framer Motion stays in the initial bundle deliberately — it's shared by above-the-fold rows/ticker/toasts, and splitting it would put async boundaries in the hottest render paths. Icons are tree-shaken `lucide-react` named imports (inline SVG, no render-blocking requests); dead `public/icons.svg` removed.
-- **Lighthouse scores:** [to be filled in manually after deploy — run Performance / Accessibility / Best Practices / SEO and record here.]
+- **Code-splitting (done).** See [Performance](#performance) for chunk sizes.
+- **Lighthouse scores:** recorded in [Performance](#performance).
 
 ## Project Layout
 
