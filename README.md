@@ -94,7 +94,8 @@ Test coverage includes portfolio math, SMA, formatting, sort/filter, Binance mes
 - **Mock data needs calibration, not randomness.** Hash-generated buy prices produced a −92% portfolio; calibrating against live prices (≈ +3.5% overall, mixed winners/losers) made the dashboard believable.
 - **Selectors returning new identities are silent killers** — in both Zustand (`Object.is` bailouts) and React (`memo`, effect deps). Caught twice: price objects and a filtered-alerts selector.
 - **Match the parser to the stream.** `@depth20` partial-book snapshots use `bids`/`asks`, not the diff-stream `b`/`a` — verified against the live socket, not the docs alone.
-- **Lighthouse scores:** [to be filled in manually after deploy — run Performance / Accessibility / Best Practices / SEO and record here; if Performance < ~90, code-split `lightweight-charts` and Recharts behind `React.lazy`.]
+- **Code-splitting (done).** The two chart renderers load behind `React.lazy` + `Suspense` with skeleton fallbacks, after first paint. Production chunks: initial `index` 390 KB (123 KB gzip: React, Framer Motion, store, header/ticker/summary/table) vs. the previous single 917 KB / 282 KB-gzip chunk (**−57%**); lazy `PortfolioChart` 355 KB (Recharts + d3), `CandleChart` 171 KB (lightweight-charts), `OrderBook` 4 KB. Framer Motion stays in the initial bundle deliberately — it's shared by above-the-fold rows/ticker/toasts, and splitting it would put async boundaries in the hottest render paths. Icons are tree-shaken `lucide-react` named imports (inline SVG, no render-blocking requests); dead `public/icons.svg` removed.
+- **Lighthouse scores:** [to be filled in manually after deploy — run Performance / Accessibility / Best Practices / SEO and record here.]
 
 ## Project Layout
 

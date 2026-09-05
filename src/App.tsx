@@ -1,15 +1,13 @@
-import { useEffect } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { MotionConfig } from 'framer-motion'
 import { RefreshCw, TriangleAlert } from 'lucide-react'
 import { AlertDialog } from './components/alerts/AlertDialog'
 import { Toaster } from './components/alerts/Toaster'
-import { CandleChart } from './components/chart/CandleChart'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
+import { Skeleton } from './components/common/Skeleton'
 import { CoinTransition } from './components/common/motion'
 import { Header } from './components/layout/Header'
-import { OrderBook } from './components/orderbook/OrderBook'
 import { SummaryCards } from './components/summary/SummaryCards'
-import { PortfolioChart } from './components/summary/PortfolioChart'
 import { HoldingsTable } from './components/table/HoldingsTable'
 import { PriceTicker } from './components/ticker/PriceTicker'
 import { FOCUSED_COINS } from './data/coins'
@@ -17,6 +15,90 @@ import { useAlertWatcher } from './hooks/useAlertWatcher'
 import { useTheme } from './hooks/useTheme'
 import { startMarketStream, stopMarketStream } from './services/marketStream'
 import { useMarketStore } from './store/marketStore'
+
+// Heavy, non-critical panels are split into separate chunks so the initial
+// bundle (header, ticker, summary, table) paints and hydrates first. The
+// chart libraries (lightweight-charts, recharts) only download when these
+// Suspense boundaries render — after first paint, while sockets connect.
+const CandleChart = lazy(() =>
+  import('./components/chart/CandleChart').then((module) => ({ default: module.CandleChart })),
+)
+const OrderBook = lazy(() =>
+  import('./components/orderbook/OrderBook').then((module) => ({ default: module.OrderBook })),
+)
+const PortfolioChart = lazy(() =>
+  import('./components/summary/PortfolioChart').then((module) => ({
+    default: module.PortfolioChart,
+  })),
+)
+
+function ChartPanelSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex-1">
+          <Skeleton className="h-5 w-32" />
+          <Skeleton className="mt-2 h-3 w-48" />
+        </div>
+        <Skeleton className="h-7 w-36" />
+      </div>
+      <Skeleton className="h-80 w-full" />
+    </div>
+  )
+}
+
+function OrderBookSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="flex-1">
+          <Skeleton className="h-5 w-28" />
+          <Skeleton className="mt-2 h-3 w-40" />
+        </div>
+        <Skeleton className="h-8 w-24" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Skeleton className="mb-2 h-4 w-16" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="h-6 w-full" />
+        </div>
+        <div>
+          <Skeleton className="mb-2 h-4 w-16" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="mb-1.5 h-6 w-full" />
+          <Skeleton className="h-6 w-full" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function PortfolioChartSkeleton() {
+  return (
+    <div
+      aria-hidden
+      className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+      <Skeleton className="h-72 w-full" />
+    </div>
+  )
+}
 
 function LoadingState() {
   return (
@@ -108,17 +190,23 @@ export default function App() {
         <div className="grid gap-6 xl:grid-cols-3">
           <CoinTransition watchKey={selectedCoinId} className="xl:col-span-2">
             <ErrorBoundary label="chart panel">
-              <CandleChart dark={dark} />
+              <Suspense fallback={<ChartPanelSkeleton />}>
+                <CandleChart dark={dark} />
+              </Suspense>
             </ErrorBoundary>
           </CoinTransition>
           <CoinTransition watchKey={selectedCoinId}>
             <ErrorBoundary label="order book">
-              <OrderBook />
+              <Suspense fallback={<OrderBookSkeleton />}>
+                <OrderBook />
+              </Suspense>
             </ErrorBoundary>
           </CoinTransition>
         </div>
         <ErrorBoundary label="portfolio chart">
-          <PortfolioChart />
+          <Suspense fallback={<PortfolioChartSkeleton />}>
+            <PortfolioChart />
+          </Suspense>
         </ErrorBoundary>
         <ErrorBoundary label="holdings table">
           <HoldingsTable />
